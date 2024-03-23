@@ -129,7 +129,7 @@ class Bot:
         self.logger.info(f"Now monitoring game id {game_id} in guild {guild_name}.")
         guild_dict = self.get_guild_dict(guild_name)
         url = game_dict["url"]
-        page_listener = BGA_Page(url, self.logger)
+        page_listener = scrapper.BGA_Page(url, self.logger)
         try:
             while game_id in list(guild_dict["games"].keys()):
                 player_up = page_listener.check_whos_up()
@@ -237,5 +237,5 @@ class Bot:
 
 if __name__ == "__main__":
     token = env.token
-    bot = scrapper.Bot(settings_file, token)
+    bot = Bot(settings_file, token)
     bot.run()
