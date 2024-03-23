@@ -10,12 +10,7 @@ import time
 
 class BGA_Page:
     def __init__(self, url, logger=logging.getLogger()):
-        # logger = logging.getLogger('selenium.webdriver')
-        # logger.propagate = False
         logger = logging.getLogger('selenium.webdriver.remote.remote_connection')
-        # logger.propagate = False
-        # logger = logging.getLogger('selenium')
-        # logger.propagate = False
         logger.setLevel(logging.CRITICAL)  # or any variant from ERROR, CRITICAL or NOTSET
 
         # Set options for WebDriver
@@ -32,16 +27,7 @@ class BGA_Page:
         
         # Open the URL
         self.driver.get(url)
-        # time.sleep(5)
-
-        # # Wait for the JavaScript to render the elements.
-        # try:
-        #     WebDriverWait(self.driver, 1).until(
-        #     EC.visibility_of((By.CLASS_NAME, "player-board"))
-        # )
-        # except:
-        #     logger.warning("could not find player boards")
-            
+        
     def check_whos_up(self):
 
         # Now that the page is loaded, find the elements as before.
