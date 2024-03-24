@@ -124,9 +124,9 @@ class Bot:
         self.logger.info(f"Now monitoring game id {game_id} in guild {guild_name}.")
         guild_dict = self.get_guild_dict(guild_name)
         url = game_dict["url"]
-        page_listener = scrapper.BGA_Page(url, self.logger)
         try:
             while game_id in list(guild_dict["games"].keys()):
+                page_listener = scrapper.BGA_Page(url, self.logger)
                 player_up = page_listener.check_whos_up()
                 if player_up is None:
                     info_str = f"[Game \"{game_dict["friendly_name"]}]({game_dict["url"]})\" appears to be over. Removing it from the game list."
@@ -147,6 +147,7 @@ class Bot:
                             await channel.send(info_str)
                         else:
                             self.delete_game(guild_games_dict=guild_dict, game_id=game_id)
+                page_listener.close()
                 await asyncio.sleep(self.refresh_time)
         finally:
             page_listener.close()
