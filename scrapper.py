@@ -7,8 +7,9 @@ import logging
 
 class BGA_Page:
     def __init__(self, url, logger=logging.getLogger()):
-        logger = logging.getLogger('selenium.webdriver.remote.remote_connection')
-        logger.setLevel(logging.CRITICAL)  # or any variant from ERROR, CRITICAL or NOTSET
+        # self.logger = logging.getLogger('selenium.webdriver.remote.remote_connection')
+        # self.logger.setLevel(logging.CRITICAL)  # or any variant from ERROR, CRITICAL or NOTSET
+        self.logger = logger
 
         # Set options for WebDriver
         chrome_options = Options()
@@ -29,9 +30,8 @@ class BGA_Page:
 
         # Now that the page is loaded, find the elements as before.
         player_boards = self.driver.find_elements(By.CLASS_NAME, "player-board")
-
         for player_board in player_boards:
-            active_player_img = player_board.find_elements(By.XPATH, ".//img[@src='https://x.boardgamearena.net/data/themereleases/240320-1000/img/layout/active_player.gif']")
+            active_player_img = player_board.find_elements(By.XPATH, ".//img[substring(@src, string-length(@src) - string-length('active_player.gif') + 1) = 'active_player.gif']")
             for img in active_player_img:
                 # Check if the parent element does not have "display:none" style.
                 parent = img.find_element(By.XPATH, "..")

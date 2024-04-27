@@ -2,16 +2,22 @@ AP Friendship:
   games:
     0:
       channel_id: 1220920543159517225
-      friendly_name: async castles of burgendy
+      friendly_name: game 0
       id: 0
-      last_player_up: slowjam
-      url: https://boardgamearena.com/3/castlesofburgundy?table=489012889
+      last_player_up: Michael_J_Reilly
+      url: https://boardgamearena.com/6/castlesofburgundy?table=492708983
   next_game_id: 1
   players:
+    HolyHamburgers:
+      id: 275694634406117376
+      name: holyhamburgers
     Michael_J_Reilly:
       id: 388166125352910849
       name: toothless_92
 toothless's server:
   games: {}
-  next_game_id: 4
-  players: {}
+  next_game_id: 0
+  players:
+    Michael_J_Reilly:
+      id: 388166125352910849
+      name: toothless_92

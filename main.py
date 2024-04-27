@@ -97,6 +97,8 @@ class Bot:
         guild_dict = self.get_guild_dict(ctx.guild.name)
         game_id = guild_dict["next_game_id"]
         guild_dict["next_game_id"] += 1
+        if friendly_name is None:
+            friendly_name = f"game {game_id}"
         guild_dict["games"][game_id] = {
             "id": game_id,
             "url": url,
@@ -127,11 +129,13 @@ class Bot:
         try:
             while game_id in list(guild_dict["games"].keys()):
                 page_listener = scrapper.BGA_Page(url, self.logger)
+                await asyncio.sleep(5)
                 player_up = page_listener.check_whos_up()
                 if player_up is None:
                     info_str = f"[Game \"{game_dict["friendly_name"]}]({game_dict["url"]})\" appears to be over. Removing it from the game list."
                     self.logger.info(info_str)
-                    self.delete_game(guild_games_dict=guild_dict, game_id=game_id)
+                    self.delete_game(guild_name=guild_name, game_id=game_id)
+                    channel = self.bot.get_channel(game_dict["channel_id"])
                     if channel is not None and isinstance(channel, discord.TextChannel):
                         await channel.send(info_str)
                 else:
@@ -146,7 +150,7 @@ class Bot:
                         if channel is not None and isinstance(channel, discord.TextChannel):
                             await channel.send(info_str)
                         else:
-                            self.delete_game(guild_games_dict=guild_dict, game_id=game_id)
+                            self.delete_game(guild_name=guild_name, game_id=game_id)
                 page_listener.close()
                 await asyncio.sleep(self.refresh_time)
         finally:
