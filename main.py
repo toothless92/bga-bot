@@ -58,6 +58,10 @@ class Bot:
         async def players(ctx):
             await self.list_players(ctx)
 
+        @self.bot.command(help="passive agressively remind players who is up.")
+        async def poke(ctx):
+            await self.poke(ctx)
+
         with open(settings_file) as stream:
             self.settings = yaml.safe_load(stream)
 
@@ -92,6 +96,21 @@ class Bot:
     
     async def on_ready(self):
         self.logger.info(f'We have logged in as {self.client.user}.')
+
+    async def poke(self, ctx):
+        guild_dict = self.get_guild_dict(ctx.guild.name)
+        for game_id in list(guild_dict["games"].keys()):
+            game_dict = guild_dict["games"][game_id]
+            player_up = game_dict["last_player_up"]
+            if player_up is not "":
+                info_str = f"{player_up} is up in [{game_dict["friendly_name"]}]({game_dict["url"]})."
+                if player_up in list(guild_dict["players"].keys()):
+                    info_str = info_str + f" <@{guild_dict["players"][player_up]["id"]}>"
+                channel = self.bot.get_channel(game_dict["channel_id"])
+                if channel is not None and isinstance(channel, discord.TextChannel):
+                    await channel.send(info_str)
+                else:
+                    self.logger.warning(f'Poke command failed in guild {ctx.guild.name}.')
 
     async def follow(self, ctx, url, friendly_name):
         guild_dict = self.get_guild_dict(ctx.guild.name)
@@ -129,8 +148,13 @@ class Bot:
         try:
             while game_id in list(guild_dict["games"].keys()):
                 page_listener = scrapper.BGA_Page(url, self.logger)
-                await asyncio.sleep(5)
-                player_up = page_listener.check_whos_up()
+                for i in range(5):
+                    await asyncio.sleep(5)
+                    player_up = page_listener.check_whos_up()
+                    if player_up is None:
+                        continue
+                    else:
+                        break
                 if player_up is None:
                     info_str = f"[Game \"{game_dict["friendly_name"]}]({game_dict["url"]})\" appears to be over. Removing it from the game list."
                     self.logger.info(info_str)
@@ -236,6 +260,7 @@ class Bot:
         self.write_data_to_file()
 
 if __name__ == "__main__":
+
     token = env.token
     bot = Bot(settings_file, token)
     bot.run()
