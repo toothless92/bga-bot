@@ -31,13 +31,15 @@ class BGA_Page:
         # Now that the page is loaded, find the elements as before.
         player_boards = self.driver.find_elements(By.CLASS_NAME, "player-board")
         for player_board in player_boards:
-            active_player_img = player_board.find_elements(By.XPATH, ".//img[substring(@src, string-length(@src) - string-length('active_player.gif') + 1) = 'active_player.gif']")
+            active_player_img = player_board.find_elements(By.XPATH, ".//img[contains(@src, 'active_player') and substring(@src, string-length(@src) - 3) = '.gif']")
+            print(f"id={player_board.get_attribute("id")}; len={len(active_player_img)}")
             for img in active_player_img:
                 # Check if the parent element does not have "display:none" style.
                 parent = img.find_element(By.XPATH, "..")
                 if "display:none" not in parent.get_attribute('style').replace(" ",""):
                     player_name_element = player_board.find_element(By.CLASS_NAME, "player-name")
                     return player_name_element.text.strip()
+        print("player not found")
         return None
     
     def close(self):   
