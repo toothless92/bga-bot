@@ -102,7 +102,7 @@ class Bot:
         for game_id in list(guild_dict["games"].keys()):
             game_dict = guild_dict["games"][game_id]
             player_up = game_dict["last_player_up"]
-            if player_up is not "":
+            if player_up != "":
                 info_str = f"{player_up} is up in [{game_dict["friendly_name"]}]({game_dict["url"]})."
                 if player_up in list(guild_dict["players"].keys()):
                     info_str = info_str + f" <@{guild_dict["players"][player_up]["id"]}>"
@@ -152,6 +152,7 @@ class Bot:
                     await asyncio.sleep(5)
                     player_up = page_listener.check_whos_up()
                     if player_up is None:
+                        self.logger.info(f"Player up not found. Waiting 5 seconds and checking again (attempt {i}).")
                         continue
                     else:
                         break
