@@ -86,10 +86,14 @@ class Bot:
                     self.all_games_dict[guild.name]["players"] = {}
 
             for guild_name in builtins.list(self.all_games_dict.keys()):
+                self.logger.info(f"{guild_name}")
                 for game_id in builtins.list(self.all_games_dict[guild_name]["games"].keys()):
                     await self.monitor_game(game_id, guild_name)
         
         self.refresh_time = self.settings["refresh_time"]
+        self.page_reread_attempts = self.settings["page_reread_attempts"]
+        self.page_reread_pause = self.settings["page_reread_pause"]
+        self.page_reload_attempts = self.settings["page_reload_attempts"]
     
     def run(self):
         self.bot.run(token, reconnect=True)
@@ -99,11 +103,12 @@ class Bot:
 
     async def poke(self, ctx):
         guild_dict = self.get_guild_dict(ctx.guild.name)
+        self.logger.info(f"Poke command received for channel {ctx.guild.name}")
         for game_id in list(guild_dict["games"].keys()):
             game_dict = guild_dict["games"][game_id]
             player_up = game_dict["last_player_up"]
             if player_up != "":
-                info_str = f"{player_up} is up in [{game_dict["friendly_name"]}]({game_dict["url"]})."
+                info_str = f"{player_up} is up in game {game_id}: [{game_dict["friendly_name"]}]({game_dict["url"]})."
                 if player_up in list(guild_dict["players"].keys()):
                     info_str = info_str + f" <@{guild_dict["players"][player_up]["id"]}>"
                 channel = self.bot.get_channel(game_dict["channel_id"])
@@ -126,7 +131,7 @@ class Bot:
             "last_player_up": ""
         }
         game_dict = guild_dict["games"][game_id]
-        info_str = f"Now following [{game_dict["friendly_name"]}]({game_dict["url"]})."
+        info_str = f"Now following game {game_id}: [{game_dict["friendly_name"]}]({game_dict["url"]})."
         self.logger.info(info_str)
         await ctx.send(info_str)
         self.write_data_to_file()
@@ -145,42 +150,70 @@ class Bot:
         self.logger.info(f"Now monitoring game id {game_id} in guild {guild_name}.")
         guild_dict = self.get_guild_dict(guild_name)
         url = game_dict["url"]
+        page_reload_counter = 0
         try:
             while game_id in list(guild_dict["games"].keys()):
-                page_listener = scrapper.BGA_Page(url, self.logger)
-                for i in range(5):
-                    await asyncio.sleep(5)
-                    player_up = page_listener.check_whos_up()
-                    if player_up is None:
-                        self.logger.info(f"Player up not found. Waiting 5 seconds and checking again (attempt {i}).")
-                        continue
-                    else:
-                        break
-                if player_up is None:
-                    info_str = f"[Game \"{game_dict["friendly_name"]}]({game_dict["url"]})\" appears to be over. Removing it from the game list."
-                    self.logger.info(info_str)
-                    self.delete_game(guild_name=guild_name, game_id=game_id)
-                    channel = self.bot.get_channel(game_dict["channel_id"])
-                    if channel is not None and isinstance(channel, discord.TextChannel):
-                        await channel.send(info_str)
-                else:
-                    if player_up != game_dict["last_player_up"] and player_up.strip() != "":
-                        game_dict["last_player_up"] = player_up
-                        self.write_data_to_file()
-                        info_str = f"{player_up} is up in [{game_dict["friendly_name"]}]({game_dict["url"]})."
-                        if player_up in list(guild_dict["players"].keys()):
-                            info_str = info_str + f" <@{guild_dict["players"][player_up]["id"]}>"
+                try:
+                    page_reload_counter += 1
+                    page_listener = scrapper.BGA_Page(url, self.logger)
+                    get_page_return = page_listener.get_page()
+                    if get_page_return:
+                        #error
+                        info_str = f"Loading page for game {game_id} failed: {str(get_page_return)}."
                         self.logger.info(info_str)
-                        channel = self.bot.get_channel(game_dict["channel_id"])
-                        if channel is not None and isinstance(channel, discord.TextChannel):
-                            await channel.send(info_str)
+                        player_up = None
+                    else:
+                        #page loaded
+                        for i in range(self.page_reread_attempts):
+                            #try reading page
+                            await asyncio.sleep(self.page_reread_pause)
+                            player_up = page_listener.check_whos_up()
+                            if player_up is None or player_up == 1:
+                                #player up not found
+                                self.logger.info(f"Player up not found for game id {game_id}. Waiting {self.page_reread_pause} seconds and checking page again (attempt {i}).")
+                                continue
+                            else:
+                                #player up found, move on
+                                break
+                            
+                    if player_up is None or player_up == 1:
+                        #player up not found after multiple reread attempts
+                        if page_reload_counter < self.page_reload_attempts:
+                            #reload attempts remaining
+                            info_str = f"Player up not found for game id {game_id}. Ignoring for now. Reload counter {page_reload_counter}/{self.page_reload_attempts}."
+                            self.logger.info(info_str)
                         else:
+                            #no reload attempts remaining
+                            info_str = f"[Game {game_id} \"{game_dict["friendly_name"]}]({game_dict["url"]})\" appears to be over. Removing it from the game list."
+                            self.logger.info(info_str)
+                            channel = self.bot.get_channel(game_dict["channel_id"])
+                            if channel is not None and isinstance(channel, discord.TextChannel):
+                                await channel.send(info_str)
                             self.delete_game(guild_name=guild_name, game_id=game_id)
-                page_listener.close()
+                    else:
+                        if player_up != game_dict["last_player_up"] and player_up.strip() != "":
+                            game_dict["last_player_up"] = player_up
+                            self.write_data_to_file()
+                            info_str = f"{player_up} is up in game {game_id}: [{game_dict["friendly_name"]}]({game_dict["url"]})."
+                            if player_up in list(guild_dict["players"].keys()):
+                                info_str = info_str + f" <@{guild_dict["players"][player_up]["id"]}>"
+                            self.logger.info(info_str)
+                            channel = self.bot.get_channel(game_dict["channel_id"])
+                            if channel is not None and isinstance(channel, discord.TextChannel):
+                                await channel.send(info_str)
+                            page_listener.close()
+                            break
+                        else:
+                            self.logger.info(f"Player up found for game {game_id} in {guild_name} ({player_up}). No change. Took {page_reload_counter} page load attempts.")
+                        page_reload_counter=0
+                finally:
+                    try:
+                        page_listener.close()
+                    except:
+                        pass
                 await asyncio.sleep(self.refresh_time)
         finally:
-            page_listener.close()
-        self.write_data_to_file()
+            self.write_data_to_file()
 
     def delete_game(self, guild_name, game_id:int):
         guild_dict = self.get_guild_dict(guild_name)
@@ -202,12 +235,13 @@ class Bot:
         guild_dict = self.get_guild_dict(ctx.guild.name)
         game_dict:dict = guild_dict["games"][game_id]
         self.delete_game(ctx.guild.name, game_id)
-        await ctx.send(f"[{game_dict["friendly_name"]}]({game_dict["url"]}) unfollowed.")
+        await ctx.send(f"Game {game_id}: [{game_dict["friendly_name"]}]({game_dict["url"]}) unfollowed.")
         self.write_data_to_file()
 
     async def show_games_list(self, ctx):
         info_str = []
         guild_dict = self.get_guild_dict(ctx.guild.name)
+        self.logger.info(f"Game list request command received from channel {ctx.guild.name}")
         if guild_dict["games"] == {}:
             await ctx.send("No games currently being monitored.")
             return
@@ -217,8 +251,12 @@ class Bot:
         await ctx.send("\n".join(info_str))
 
     async def reset(self, ctx):
+        self.logger.info(f"Reset command received for channel {ctx.guild.name}")
         for game_id in list(self.all_games_dict[ctx.guild.name]["games"].keys()):
             await self.unfollow(ctx, game_id)
+        guild_dict = self.get_guild_dict(ctx.guild.name)
+        guild_dict["next_game_id"] = 1
+        self.write_data_to_file()
 
     def write_data_to_file(self):
         with open(dump_file, 'w') as stream:
@@ -248,6 +286,7 @@ class Bot:
         self.write_data_to_file()
     
     async def list_players(self, ctx):
+        self.logger.info(f"List players command received for channel {ctx.guild.name}")
         guild_dict = self.get_guild_dict(ctx.guild.name)
         info_str = ["BGA handle - Discord handle"]
         info_str.append("=========================")
