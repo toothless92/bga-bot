@@ -1,4 +1,4 @@
-refresh_time: 60 # seconds
-page_reread_attempts: 5
+refresh_time: 10 # seconds
+page_reread_attempts: 2
 page_reread_pause: 5 #seconds
 page_reload_attempts: 30

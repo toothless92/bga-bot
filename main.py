@@ -19,6 +19,7 @@ class Bot:
         self.logger = copy.copy(logging.getLogger('discord'))
         self.logger.name = "bga-bot"
         self.logger.setLevel(logging.INFO)
+        self.logger.info(f"{'*'*50}")
 
         intents = discord.Intents.default()
         intents.message_content = True
@@ -80,15 +81,15 @@ class Bot:
                     data = {}
                 self.all_games_dict = data
                 if guild.name not in builtins.list(self.all_games_dict.keys()):
+                    self.logger(f"Adding new guild to local record: {guild.name}")
                     self.all_games_dict[guild.name] = {}
                     self.all_games_dict[guild.name]["games"] = {}
                     self.all_games_dict[guild.name]["next_game_id"] = 0
                     self.all_games_dict[guild.name]["players"] = {}
 
-            for guild_name in builtins.list(self.all_games_dict.keys()):
-                self.logger.info(f"{guild_name}")
+            for guild_name in list(self.all_games_dict.keys()):
                 for game_id in builtins.list(self.all_games_dict[guild_name]["games"].keys()):
-                    await self.monitor_game(game_id, guild_name)
+                    asyncio.create_task(self.monitor_game(game_id, guild_name))
         
         self.refresh_time = self.settings["refresh_time"]
         self.page_reread_attempts = self.settings["page_reread_attempts"]
@@ -135,7 +136,7 @@ class Bot:
         self.logger.info(info_str)
         await ctx.send(info_str)
         self.write_data_to_file()
-        await self.monitor_game(game_id, ctx.guild.name)
+        asyncio.create_task(self.monitor_game(game_id, ctx.guild.name))
 
     def get_guild_dict(self, guild_name):
         if guild_name not in list(self.all_games_dict.keys()):
@@ -156,13 +157,8 @@ class Bot:
                 try:
                     page_reload_counter += 1
                     page_listener = scrapper.BGA_Page(url, self.logger)
-                    get_page_return = page_listener.get_page()
-                    if get_page_return:
-                        #error
-                        info_str = f"Loading page for game {game_id} failed: {str(get_page_return)}."
-                        self.logger.info(info_str)
-                        player_up = None
-                    else:
+                    try:
+                        get_page_return = page_listener.get_page()
                         #page loaded
                         for i in range(self.page_reread_attempts):
                             #try reading page
@@ -170,11 +166,16 @@ class Bot:
                             player_up = page_listener.check_whos_up()
                             if player_up is None or player_up == 1:
                                 #player up not found
-                                self.logger.info(f"Player up not found for game id {game_id}. Waiting {self.page_reread_pause} seconds and checking page again (attempt {i}).")
+                                self.logger.info(f"Player up not found for game id {game_id}. Waiting {self.page_reread_pause} seconds and checking page again (attempt {i}/{self.page_reread_attempts}).")
                                 continue
                             else:
                                 #player up found, move on
                                 break
+                    except:
+                        #error
+                        info_str = f"Loading page for game {game_id} failed: {str(get_page_return)}."
+                        self.logger.info(info_str)
+                        player_up = None
                             
                     if player_up is None or player_up == 1:
                         #player up not found after multiple reread attempts
@@ -192,7 +193,6 @@ class Bot:
                             self.delete_game(guild_name=guild_name, game_id=game_id)
                     else:
                         if player_up != game_dict["last_player_up"] and player_up.strip() != "":
-                            game_dict["last_player_up"] = player_up
                             self.write_data_to_file()
                             info_str = f"{player_up} is up in game {game_id}: [{game_dict["friendly_name"]}]({game_dict["url"]})."
                             if player_up in list(guild_dict["players"].keys()):
@@ -200,12 +200,17 @@ class Bot:
                             self.logger.info(info_str)
                             channel = self.bot.get_channel(game_dict["channel_id"])
                             if channel is not None and isinstance(channel, discord.TextChannel):
-                                await channel.send(info_str)
-                            page_listener.close()
-                            break
+                                try:
+                                    await channel.send(info_str)
+                                    game_dict["last_player_up"] = player_up
+                                finally:
+                                    page_listener.close()
+                                    self.write_data_to_file()
                         else:
                             self.logger.info(f"Player up found for game {game_id} in {guild_name} ({player_up}). No change. Took {page_reload_counter} page load attempts.")
                         page_reload_counter=0
+                except Exception as e:
+                    self.logger(f"Exception encountered while monitoring game {game_id} in {guild_name}: {e}")
                 finally:
                     try:
                         page_listener.close()
