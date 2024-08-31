@@ -13,6 +13,18 @@ import scrapper
 settings_file = "settings.yaml"
 dump_file = "data.yaml"
 
+# Suppress only the discord.gateway heartbeat warning
+discord_gateway_logger = logging.getLogger('discord.gateway')
+discord_gateway_logger.setLevel(logging.ERROR)  # Set level higher to suppress the warning
+
+# Alternatively, to suppress the traceback while keeping the warning message:
+discord_gateway_logger.propagate = False
+handler = logging.StreamHandler()
+handler.setLevel(logging.WARNING)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+discord_gateway_logger.addHandler(handler)
+
 class Bot:
 
     def __init__(self, settings_file:str, token:str):
@@ -154,13 +166,14 @@ class Bot:
         page_reload_counter = 0
         try:
             while game_id in list(guild_dict["games"].keys()):
+                self.logger.info(f"{'$'*50}\nTasks:\n{asyncio.all_tasks()}")
                 try:
                     page_reload_counter += 1
                     page_listener = scrapper.BGA_Page(url, self.logger)
                     try:
                         get_page_return = page_listener.get_page()
                         #page loaded
-                        for i in range(self.page_reread_attempts):
+                        for i in range(1, self.page_reread_attempts):
                             #try reading page
                             await asyncio.sleep(self.page_reread_pause)
                             player_up = page_listener.check_whos_up()
@@ -206,6 +219,7 @@ class Bot:
                                 finally:
                                     page_listener.close()
                                     self.write_data_to_file()
+                                    self.logger.info(f"Finished new player up sequence {player_up}/{game_id}/{guild_name}.")
                         else:
                             self.logger.info(f"Player up found for game {game_id} in {guild_name} ({player_up}). No change. Took {page_reload_counter} page load attempts.")
                         page_reload_counter=0
