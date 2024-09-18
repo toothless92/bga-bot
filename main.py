@@ -102,7 +102,7 @@ class Bot:
                     data = {}
                 self.all_games_dict = data
                 if guild.name not in builtins.list(self.all_games_dict.keys()):
-                    self.logger(f"Adding new guild to local record: {guild.name}")
+                    self.logger.info(f"Adding new guild to local record: {guild.name}")
                     self.all_games_dict[guild.name] = {}
                     self.all_games_dict[guild.name]["games"] = {}
                     self.all_games_dict[guild.name]["next_game_id"] = 0
@@ -268,7 +268,7 @@ class Bot:
                                 self.logger.info(f"Player up found for game {game_id} in {guild_name} ({player_up}). No change. Took {page_reload_counter} page load attempts.")
                             page_reload_counter=0
                     except Exception as e:
-                        self.logger(f"Exception encountered while monitoring game {game_id} in {guild_name}: {e}")
+                        self.logger.info(f"Exception encountered while monitoring game {game_id} in {guild_name}: {e}")
                     finally:
                         try:
                             page_listener.close()
