@@ -4,6 +4,7 @@ import copy
 import logging
 import time
 import yaml
+import pprint
 
 import discord
 from discord.ext import commands
@@ -209,7 +210,8 @@ class Bot:
             while game_id in list(guild_dict["games"].keys()):
                 if not self.get_mute_start_time(guild_dict):
                     self.update_mute_start_time(guild_dict, 0)
-                # self.logger.info(f"{'$'*50}\nTasks:\n{asyncio.all_tasks()}")
+                self.logger.info(f"Task list for debugging (currently at top of monitor while loop):\n{(" "*42) + (" "*42).join(pprint.pformat([(str(f)[:75]) for f in asyncio.all_tasks()]).splitlines(True))}")
+                
                 if int(time.time()) - guild_dict["mute_time_start"] > 60*60:
                     try:
                         page_reload_counter += 1
@@ -217,13 +219,13 @@ class Bot:
                         try:
                             get_page_return = page_listener.get_page()
                             #page loaded
-                            for i in range(1, self.page_reread_attempts):
+                            for i in range(1, self.page_reread_attempts + 1):
                                 #try reading page
                                 await asyncio.sleep(self.page_reread_pause)
                                 player_up = page_listener.check_whos_up()
                                 if player_up is None or player_up == 1:
                                     #player up not found
-                                    self.logger.info(f"Player up not found for game id {game_id}. Waiting {self.page_reread_pause} seconds and checking page again (attempt {i}/{self.page_reread_attempts}).")
+                                    self.logger.info(f"--> Player up not found for game id {game_id}. Waiting {self.page_reread_pause} seconds and checking page again (attempt {i}/{self.page_reread_attempts}).")
                                     continue
                                 else:
                                     #player up found, move on
